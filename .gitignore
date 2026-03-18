@@ -1,0 +1,10 @@
+# Compiled binary (users compile locally)
+scripts/qr-decode
+!scripts/qr-decode.swift
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
