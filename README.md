@@ -98,3 +98,5 @@ The insight came from OpenClaw using CoreImage while Claude Code was stuck tryin
 ## License
 
 MIT
+
+中文文档: [README_CN.md](README_CN.md)

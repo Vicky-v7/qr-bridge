@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Swift decoder
+        run: swiftc scripts/qr-decode.swift -o scripts/qr-decode -O
+
+      - name: Install Python qrcode
+        run: pip3 install "qrcode[pil]"
+
+      - name: Run tests
+        run: bash tests/test.sh
