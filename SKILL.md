@@ -112,11 +112,16 @@ After tracing, inspect the final URL for access gates. Check for these patterns:
 - Domain contains: `weixin.qq.com`, `work.weixin.qq.com`, `mp.weixin.qq.com`, `open.weixin.qq.com`
 - Redirect to `open.weixin.qq.com/connect/oauth2/authorize`
 - Response contains: `请在微信客户端打开`, `请在企业微信客户端打开`
+- Response header `logicret: -2` = article not found / deleted / unpublished
 - User-Agent gating: returns different content for WeChat UA vs browser UA
+- WeChat mini-program links: `weixin://dl/business/?appid=` — cannot be opened outside WeChat
 
 **App-Gated Links:**
-- Domain contains: `tb.cn` (Taobao), `m.tb.cn`, `douyin.com`, `xhslink.com` (Xiaohongshu)
-- Response contains deep-link schemes: `weixin://`, `alipays://`, `tbopen://`, `snssdk://`
+- Taobao: `tb.cn`, `m.tb.cn` — returns 200 with JS redirect to Taobao app. Look for `tbopen://` scheme or `s_status: STATUS_NORMAL` header
+- Douyin: `v.douyin.com` — 302 redirect to `www.douyin.com`, then 404 for invalid links. Valid links redirect to `www.douyin.com/video/`
+- Xiaohongshu: `xhslink.com` — 307 → `www.xiaohongshu.com`. Look for `snssdk://` or `xhsdiscover://` deep-link schemes
+- Alipay: `ur.alipay.com` — redirects to `alipays://` scheme
+- Response contains deep-link schemes: `weixin://`, `alipays://`, `tbopen://`, `snssdk://`, `xhsdiscover://`
 - Meta refresh or JavaScript redirect to app store
 
 **Login Walls:**
@@ -124,18 +129,33 @@ After tracing, inspect the final URL for access gates. Check for these patterns:
 - Redirect to `/login`, `/signin`, `/oauth/authorize`
 - Response contains login form elements
 
+**Content Validity Check (run AFTER gate detection):**
+- WeChat: header `logicret` value — `-2` means content invalid/deleted
+- Douyin: final destination is 404 = video removed or link expired
+- Taobao: response body contains `对不起` or `宝贝不存在` = product delisted
+
 **Detection commands:**
 ```bash
-# Check with browser-like UA
+# Step 1: Check response headers for platform signals
+curl -sI --max-redirs 10 --connect-timeout 10 "URL_HERE" 2>&1
+
+# Step 2: Check with browser-like UA
 curl -sL --max-redirs 10 --connect-timeout 10 \
   -H "User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15" \
   "URL_HERE" | head -c 5000
 
-# Check with WeChat UA (reveals WeChat-gated content)
+# Step 3: Check with WeChat UA (reveals WeChat-gated content)
 curl -sL --max-redirs 10 --connect-timeout 10 \
   -H "User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 MicroMessenger/8.0.0" \
   "URL_HERE" | head -c 5000
+
+# Step 4: Compare — if Step 2 and Step 3 return different content, the link is UA-gated
 ```
+
+**Header signals to check:**
+- `logicret: -2` → WeChat article invalid
+- `s_status: STATUS_NORMAL` → Taobao link active
+- `Location:` containing app deep-link schemes → app-gated redirect
 
 ### 4. DIAGNOSE - Explain and suggest next steps
 
@@ -169,7 +189,13 @@ Based on decode + trace + inspect results, provide a structured diagnosis:
 | Gate Type | Why It Fails | What It Needs |
 |-----------|-------------|---------------|
 | WeChat | Link requires WeChat's built-in browser | Open in WeChat app > scan QR |
+| WeChat (invalid) | `logicret: -2` — article deleted/unpublished | Request a valid article link |
 | WeCom | Enterprise WeChat only | Must be a WeCom member of that org |
+| Taobao | JS redirect to Taobao app | Open link in Taobao/淘宝 app |
+| Douyin | 302→douyin.com, content requires app | Open in Douyin/抖音 app |
+| Xiaohongshu | 307→xiaohongshu.com, app deep-link | Open in 小红书 app |
+| Alipay | `alipays://` scheme redirect | Open in Alipay/支付宝 app |
+| Mini Program | `weixin://dl/business/` scheme | Open in WeChat > scan QR to launch mini-program |
 | Login Wall | Requires authentication | Sign in at [domain] first |
 | App-Only | Deep link to native app | Install [app name] and scan in-app |
 | Expired | Short link no longer resolves | Link has expired, request a new one |
