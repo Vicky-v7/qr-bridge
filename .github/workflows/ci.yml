@@ -15,7 +15,7 @@ jobs:
         run: swiftc scripts/qr-decode.swift -o scripts/qr-decode -O
 
       - name: Install Python qrcode
-        run: pip3 install "qrcode[pil]"
+        run: pip3 install --break-system-packages "qrcode[pil]"
 
       - name: Run tests
         run: bash tests/test.sh
